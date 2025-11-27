@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Skill, Perk, SkillType } from '../types';
 
@@ -228,9 +229,10 @@ interface SkillTreeModalProps {
   skill: Skill;
   onClose: () => void;
   onUnlock: (skillId: string, perkId: string, cost: number) => void;
+  onBack?: () => void;
 }
 
-const SkillTreeModal: React.FC<SkillTreeModalProps> = ({ skill, onClose, onUnlock }) => {
+const SkillTreeModal: React.FC<SkillTreeModalProps> = ({ skill, onClose, onUnlock, onBack }) => {
   const perks = PERK_TREE[skill.id] || [];
   const [hoveredPerkId, setHoveredPerkId] = useState<string | null>(null);
 
@@ -257,11 +259,24 @@ const SkillTreeModal: React.FC<SkillTreeModalProps> = ({ skill, onClose, onUnloc
         
         {/* Header */}
         <div className="p-4 border-b border-gray-800 bg-gradient-to-r from-gray-950 to-gray-900 flex justify-between items-center z-10">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2" style={{ color: skill.color }}>
-              {skill.name} Tree
-            </h2>
-            <p className="text-gray-400 text-xs">Mastery Level {skill.level}</p>
+          <div className="flex items-center gap-4">
+            {onBack && (
+                <button 
+                    onClick={onBack}
+                    className="p-2 hover:bg-gray-800 rounded-full text-gray-400 hover:text-white transition-colors group"
+                    title="Back to Skills List"
+                >
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                     </svg>
+                </button>
+            )}
+            <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2" style={{ color: skill.color }}>
+                {skill.name} Tree
+                </h2>
+                <p className="text-gray-400 text-xs">Mastery Level {skill.level}</p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
              <div className="text-right">

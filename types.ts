@@ -79,7 +79,8 @@ export enum ScrollEffect {
     DRAIN_XP = 'DRAIN_XP',
     TELEPORT = 'TELEPORT',
     LIGHTNING_SELF = 'LIGHTNING_SELF', // New: Negative Lightning
-    LIGHTNING_AOE = 'LIGHTNING_AOE'    // New: Positive Lightning
+    LIGHTNING_AOE = 'LIGHTNING_AOE',    // New: Positive Lightning
+    LEVEL_UP = 'LEVEL_UP' // New: Instant Level Up
 }
 
 export enum PotionEffect {
@@ -107,6 +108,7 @@ export interface ActiveEffect {
     duration: number;
     magnitude: number;
     isNegative: boolean;
+    durationUnit?: 'turn' | 'floor';
 }
 
 export interface ElementalAffix {

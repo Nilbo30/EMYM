@@ -223,7 +223,7 @@ export const generateRandomEquipment = (levelNum: number, lootConfig: LootConfig
 };
 
 export const generateRandomScroll = (levelNum: number): Entity => {
-    const descriptors = ['Dusty', 'Ancient', 'Runed', 'Vibrating', 'Burnt', 'Singed', 'Golden', 'Dark', 'Bloody', 'Glowing', 'Electric', 'Static'];
+    const descriptors = ['Dusty', 'Ancient', 'Runed', 'Vibrating', 'Burnt', 'Singed', 'Golden', 'Dark', 'Bloody', 'Glowing', 'Electric', 'Static', 'Forbidden', 'Divine'];
     const name = `${descriptors[Math.floor(Math.random() * descriptors.length)]} Scroll`;
     
     // Weighted Effects
@@ -242,21 +242,26 @@ export const generateRandomScroll = (levelNum: number): Entity => {
         effect = ScrollEffect.HEAL_STAMINA;
         magnitude = 40 + scaling * 3;
     }
-    else if (roll < 0.60) {
+    else if (roll < 0.55) {
         effect = ScrollEffect.DAMAGE; // Cursed!
         magnitude = 10 + scaling;
     }
-    else if (roll < 0.70) {
+    else if (roll < 0.65) {
         effect = ScrollEffect.DRAIN_XP; // Cursed!
         magnitude = 30 + scaling;
     }
-    else if (roll < 0.80) {
+    else if (roll < 0.75) {
         effect = ScrollEffect.LIGHTNING_SELF; // New Negative
         magnitude = 15 + scaling;
     }
-    else if (roll < 0.90) {
+    else if (roll < 0.85) {
         effect = ScrollEffect.LIGHTNING_AOE; // New Positive
         magnitude = 15 + scaling * 2;
+    }
+    else if (roll < 0.90) {
+        // Rare: Level Up
+        effect = ScrollEffect.LEVEL_UP;
+        magnitude = 1; // 1 Level
     }
     else {
         effect = ScrollEffect.TELEPORT; // Neutral
@@ -270,7 +275,7 @@ export const generateRandomScroll = (levelNum: number): Entity => {
         symbol: '?',
         color: '#e2e8f0', // White/Paper color
         position: { x: 0, y: 0 },
-        rarity: Rarity.UNCOMMON,
+        rarity: effect === ScrollEffect.LEVEL_UP ? Rarity.EPIC : Rarity.UNCOMMON,
         scrollEffect: effect,
         magnitude, // Store calculated magnitude
         flavor: "The runes shift when you look at them. Effect unknown until read."
@@ -312,9 +317,17 @@ export const generateRandomPotion = (levelNum: number, lootConfig: LootConfig): 
          ];
          const effect = effects[Math.floor(Math.random() * effects.length)];
          
-         // Duration in turns
-         let duration = 40; 
-         if (Math.random() < 0.15) duration = 80; 
+         // Set duration based on type. Stats = Floor based (small number), DOT/HOT = Turn based (large number)
+         const isTurnBased = effect === PotionEffect.REGEN || effect === PotionEffect.POISON;
+         
+         let duration = 0;
+         if (isTurnBased) {
+             duration = 30; // 30 Turns default
+             if (Math.random() < 0.15) duration = 60; // Long lasting poison/regen
+         } else {
+             duration = 1; // 1 Floor default
+             if (Math.random() < 0.10) duration = 2; // Rare 2 floors
+         }
          
          // Scaling Magnitude based on Dungeon Level
          let magnitude = 1;

@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { ActiveEffect, PotionEffect } from '../types';
 
@@ -37,6 +38,8 @@ const EffectTooltip: React.FC<EffectTooltipProps> = ({ effect, position }) => {
       transform: isRightSide ? 'translateX(-100%)' : 'none'
   };
 
+  const unitLabel = effect.durationUnit === 'turn' ? 'Turns' : 'Floors';
+
   return (
     <div 
       className="fixed z-[100] pointer-events-none animate-fade-in"
@@ -54,7 +57,7 @@ const EffectTooltip: React.FC<EffectTooltipProps> = ({ effect, position }) => {
         <div className="space-y-1">
             <div className="flex justify-between items-center text-xs">
                 <span className="text-gray-500 uppercase text-[10px] font-bold">Duration</span>
-                <span className="font-mono text-white">{effect.duration} Floors</span>
+                <span className="font-mono text-white">{effect.duration} {unitLabel}</span>
             </div>
              <div className="flex justify-between items-center text-xs">
                 <span className="text-gray-500 uppercase text-[10px] font-bold">Magnitude</span>

@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { 
@@ -974,32 +976,7 @@ const App: React.FC = () => {
             return;
         } 
         else if (targetEntity.type === EntityType.CHEST && !targetEntity.isOpen) {
-            setGameState(prev => {
-                const dungeoneerRank = prev.player.skills.luck.unlockedPerks.filter(p => p === 'dungeoneer').length;
-                const trapAvoidChance = dungeoneerRank * 0.1;
-
-                if (targetEntity.isTrapped && Math.random() > trapAvoidChance && Math.random() < 0.5) {
-                    // Logic handles inside setGameState correctly but calls to addLog inside are side-effects.
-                    // Ideally we construct the logs array here.
-                    // For simplicity, we keep existing structure but we must ensure gainXp calls are safe or done differently.
-                    // Since chest opening is rare, calling gainXp here usually works "okay" due to batching, 
-                    // but we should technically fix it too. However, the MAIN issue was handleMove's frequent updates.
-                    
-                    // NOTE: Calling gainXp inside setGameState is the anti-pattern causing issues.
-                    // We will allow it for now for CHESTS only as refactoring everything is huge, 
-                    // and chests don't happen every step.
-                }
-                
-                // ... However, we can just trigger it OUTSIDE if possible.
-                // For now, let's just proceed with the critical movement fix.
-                return prev; // We will use the logic below for Chest to be safe? No, Chest logic is complex.
-            });
-
-            // Re-implementing Chest Logic safely would require moving gainXp out. 
-            // Given the complexity, let's stick to fixing the MOVEMENT loop first which is the high-frequency bug source.
-            // We'll revert to the previous "unsafe" pattern just for Chest/Portal to avoid breaking them, 
-            // but wrapped in a way that doesn't conflict with movement.
-            
+            // Simplified Chest Logic directly to state
             setGameState(prev => {
                  const dungeoneerRank = prev.player.skills.luck.unlockedPerks.filter(p => p === 'dungeoneer').length;
                  const trapAvoidChance = dungeoneerRank * 0.1;
@@ -1009,14 +986,9 @@ const App: React.FC = () => {
                  if (targetEntity.isTrapped && Math.random() > trapAvoidChance && Math.random() < 0.5) {
                      logs.push({ id: uuidv4(), message: "It was trapped! You take 10 damage.", type: 'danger', timestamp: Date.now() });
                      newHp -= 10;
-                     // We can't call gainXp('defense') easily here without side effect.
-                     // We'll skip Defense XP on chest traps for now to ensure stability.
                  }
                  
                  logs.push({ id: uuidv4(), message: "You open the chest.", type: 'gain', timestamp: Date.now() });
-                 // gainXp('luck', 20); -> Skipped to avoid conflict, or we need to extract logic.
-                 // Actually, we can schedule it? No.
-                 // Let's rely on the user manual interaction for now.
                  
                  const greedRank = prev.player.skills.luck.unlockedPerks.filter(p => p === 'greed').length;
                  const drops = targetEntity.chestContents || [];
@@ -1063,11 +1035,24 @@ const App: React.FC = () => {
              const nextLevel = generateDungeon(lvl, lootConfig);
              addLog(targetEntity.type === EntityType.PORTAL ? "You step into the abyss..." : `You descend to level ${lvl}.`, "info");
              
-             setGameState(prev => ({
-                 ...prev,
-                 dungeon: nextLevel,
-                 player: { ...prev.player, position: nextLevel.playerStart || {x: 1, y: 1} } 
-             }));
+             setGameState(prev => {
+                // Decrement floor-based effects on level change
+                 const nextLevelEffects = prev.player.activeEffects
+                 .map(e => {
+                     // If it's explicitly floor-based, decrement duration
+                     // If durationUnit is undefined (legacy/turn-based implicit), we treat it as turn based usually, 
+                     // but here we specifically target 'floor'.
+                     if (e.durationUnit === 'floor') return { ...e, duration: e.duration - 1 };
+                     return e;
+                 })
+                 .filter(e => e.duration > 0);
+
+                 return {
+                     ...prev,
+                     dungeon: nextLevel,
+                     player: { ...prev.player, position: nextLevel.playerStart || {x: 1, y: 1}, activeEffects: nextLevelEffects } 
+                 };
+             });
              setIsProcessing(false);
              return;
         }
@@ -1114,6 +1099,10 @@ const App: React.FC = () => {
       let currentInventory = [...prev.player.inventory];
       let currentEquipment = { ...prev.player.equipment };
       let currentGold = prev.player.gold;
+      
+      // Track final position (can be changed by traps)
+      let finalX = newX;
+      let finalY = newY;
 
       // Survivalist Logic (Triggers at < 10)
       if (newStamina < 10 && prev.player.skills.survival.unlockedPerks.includes('survivalist')) {
@@ -1162,9 +1151,13 @@ const App: React.FC = () => {
           logUpdates.push({ id: uuidv4(), message: "Exhausted! You take damage.", type: 'danger', timestamp: Date.now() });
       }
 
-      // Handle Active Effects
+      // Handle Active Effects - Decrement TURN based effects here
       let newActiveEffects = prev.player.activeEffects
-          .map(e => ({ ...e, duration: e.duration - 1 }))
+          .map(e => {
+              // Only decrement if turn based (or undefined default)
+              if (e.durationUnit === 'turn' || !e.durationUnit) return { ...e, duration: e.duration - 1 };
+              return e; // Floor based are touched in stairs logic
+          })
           .filter(e => e.duration > 0);
 
       newActiveEffects.forEach(eff => {
@@ -1182,7 +1175,7 @@ const App: React.FC = () => {
               ...prev, 
               player: { 
                   ...prev.player, 
-                  position: { x: newX, y: newY },
+                  position: { x: finalX, y: finalY },
                   stamina: newStamina,
                   hp: newHp,
                   mana: newMana,
@@ -1268,6 +1261,17 @@ const App: React.FC = () => {
                logUpdates.push({ id: uuidv4(), message: "You triggered a trap!", type: 'danger', timestamp: Date.now() });
                if (trap.trapEffect === 'teleport') {
                    // teleport logic
+                   let tx = 0, ty = 0;
+                   let tries = 0;
+                   while(tries < 100) {
+                       tx = Math.floor(Math.random() * prev.dungeon.width);
+                       ty = Math.floor(Math.random() * prev.dungeon.height);
+                       if (prev.dungeon.tiles[ty][tx] === EntityType.FLOOR && !prev.dungeon.entities.some(e => e.position.x === tx && e.position.y === ty)) break;
+                       tries++;
+                   }
+                   finalX = tx;
+                   finalY = ty;
+                   logUpdates.push({ id: uuidv4(), message: "Teleport Trap! You are warped.", type: 'danger', timestamp: Date.now() });
                } else {
                    newHp -= 10;
                    // gainXp('defense', 15); // Skipped
@@ -1283,7 +1287,7 @@ const App: React.FC = () => {
               ...prev, 
               player: { 
                   ...prev.player, 
-                  position: { x: newX, y: newY },
+                  position: { x: finalX, y: finalY },
                   stamina: newStamina,
                   hp: newHp,
                   mana: newMana,
@@ -1314,7 +1318,7 @@ const App: React.FC = () => {
         ...prev,
         player: {
           ...prev.player,
-          position: { x: newX, y: newY },
+          position: { x: finalX, y: finalY },
           stamina: newStamina,
           hp: newHp,
           mana: newMana,
@@ -1327,7 +1331,7 @@ const App: React.FC = () => {
             ...prev.dungeon,
             entities: finalEntities,
             explored: prev.dungeon.explored.map((row, y) => row.map((val, x) => {
-                const dist = Math.sqrt((x - newX)**2 + (y - newY)**2);
+                const dist = Math.sqrt((x - finalX)**2 + (y - finalY)**2);
                 return val || dist < 6; 
             }))
         },
@@ -1620,6 +1624,7 @@ const App: React.FC = () => {
             <SkillTreeModal 
                 skill={gameState.player.skills[selectedSkillId]} 
                 onClose={() => setActiveModal(null)}
+                onBack={() => setActiveModal('skills')}
                 onUnlock={(skillId, perkId, cost) => {
                     setGameState(prev => {
                         const skill = { ...prev.player.skills[skillId] };
@@ -1767,6 +1772,24 @@ const App: React.FC = () => {
                                     return e;
                                 }).filter(e => e.type !== EntityType.ENEMY || (e.hp || 0) > 0);
                                 effectLog = `Chain Lightning! Hit ${hits} enemies for ${dmg} damage.`;
+                            } else if (item.scrollEffect === ScrollEffect.LEVEL_UP) {
+                                const validSkills = (Object.values(prev.player.skills) as Skill[]).filter(s => s.xp > 0 || s.level > 1);
+                                if (validSkills.length > 0) {
+                                    const randomSkill = validSkills[Math.floor(Math.random() * validSkills.length)];
+                                    const skillId = randomSkill.id;
+
+                                    const newSkill = { ...randomSkill };
+                                    newSkill.level += 1;
+                                    newSkill.points += 1;
+                                    newSkill.maxXp = Math.floor(newSkill.maxXp * 1.2);
+
+                                    newSkills = { ...newSkills, [skillId]: newSkill };
+                                    effectLog = `Forbidden Knowledge! ${newSkill.name} is now Level ${newSkill.level}!`;
+                                    logType = 'gain';
+                                } else {
+                                    effectLog = "The runes fade... you have no experience to build upon.";
+                                    logType = 'info';
+                                }
                             }
 
                             const newInv = prev.player.inventory.filter(i => i.id !== item.id);
@@ -1859,12 +1882,16 @@ const App: React.FC = () => {
                                   if (!newKnown.includes(item.potionEffect)) newKnown.push(item.potionEffect);
                                   // Potion logic ...
                                   const isNegative = [PotionEffect.POISON, PotionEffect.WEAKNESS, PotionEffect.FRAILTY, PotionEffect.SLOWNESS, PotionEffect.LIGHTNING_RES_DOWN].includes(item.potionEffect);
+                                  
+                                  const isTurnBased = item.potionEffect === PotionEffect.REGEN || item.potionEffect === PotionEffect.POISON;
+
                                   newEffects.push({
                                       type: item.potionEffect,
                                       name: item.potionEffect.replace('_', ' '),
-                                      duration: (item.effectDuration || 30), // Default to 30 turns if undefined
+                                      duration: (item.effectDuration || (isTurnBased ? 30 : 1)), 
                                       magnitude: item.magnitude || 1,
-                                      isNegative
+                                      isNegative,
+                                      durationUnit: isTurnBased ? 'turn' : 'floor'
                                   });
                                   logMsg += " Effect applied.";
                               } else if (item.value) {
