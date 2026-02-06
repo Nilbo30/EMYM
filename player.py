@@ -22,7 +22,7 @@ def calculate_visible_tiles(player_x, player_y, vision_radius):
     Calcule quelles cases sont visibles autour du joueur
     Retourne une liste de tuples (x, y)
     """
-    visible = []
+    visible = set()
 
     # On regarde toutes les cases dans un carré autour du joueur
     for y in range(player_y - vision_radius, player_y + vision_radius + 1):
@@ -32,7 +32,7 @@ def calculate_visible_tiles(player_x, player_y, vision_radius):
 
             # Si assez proche, c'est visible
             if distance <= vision_radius:
-                visible.append((x, y))
+                visible.add((x, y))
 
     return visible
 

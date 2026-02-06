@@ -5,7 +5,7 @@ Fonctions d'affichage / rendu graphique
 import pygame
 
 # On aura besoin de ces variables globales
-visible_tiles = []
+visible_tiles = set()
 
 def draw_map(screen, game_map, explored, font, TILE_SIZE, MAP_HEIGHT, MAP_WIDTH):
     """Dessine toute la carte avec fog of war"""
@@ -142,7 +142,6 @@ def draw_inventory(screen, inventory, SCREEN_WIDTH, SCREEN_HEIGHT):
     TEXT_COLOR = (255, 255, 255)  # Blanc
     TITLE_COLOR = (255, 255, 100)  # Jaune
     BUTTON_COLOR = (180, 50, 50)  # Rouge pour le bouton fermer
-    BUTTON_HOVER = (220, 80, 80)  # Rouge plus clair au survol
 
     # Fond semi-transparent (assombrir le jeu derrière)
     overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))

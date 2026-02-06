@@ -39,6 +39,8 @@ items = []
 rooms = []
 current_floor = 1
 inventory_open = False
+inventory_rects = None
+inventory_button_rect = (0, 0, 0, 0)
 
 
 def create_explored_map():
@@ -234,7 +236,7 @@ while running:
         if 0 <= x < MAP_WIDTH and 0 <= y < MAP_HEIGHT:
             explored[y][x] = True
 
-# Détecter le survol de souris (pour les tooltips)
+    # Détecter le survol de souris (pour les tooltips)
     hovered_item = None
     hovered_enemy = None
     mouse_x, mouse_y = pygame.mouse.get_pos()
